@@ -201,7 +201,7 @@ exports.forgotUserPw = async (req, res, next) => {
   //1st step => get user email
   const user = await User.findOne({ email: req.body.email });
   if (!user) {
-    res.status(400).json({
+    res.status(404).json({
       status: "error",
       message: "No user found linked with this email address !",
     });

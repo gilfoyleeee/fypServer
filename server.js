@@ -18,11 +18,11 @@ const DB = process.env.DB_url.replace("<password>", process.env.DB_pw);
 
 mongoose.connect(DB, {
     useNewUrlParser: true,
-    useCreateIndex: true,
-    useFindAndModify: false,
+    // useCreateIndex: true,
+    // useFindAndModify: false,
     useUnifiedTopology: true,
 }).then((con) => {
-    consolelog("MongoDB sucessfully connected !")
+    console.log("MongoDB sucessfully connected !")
 }).catch((err) => {
     console.log(err);
 });
