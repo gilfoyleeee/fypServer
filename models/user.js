@@ -2,6 +2,7 @@
 
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 
 const userSchema = new mongoose.Schema({
   firstName: {
@@ -33,13 +34,16 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
   },
-  passwordChangedAt: {
-    type: Date,
-  },
-  passwordResetToken: {
+  confirmPw: {
     type: String,
   },
-  passwordResetExpires: {
+  pwChangedTime: {
+    type: Date,
+  },
+  pwResetToken: {
+    type: String,
+  },
+  pwResetExpireDate: {
     type: Date,
   },
   createdAt: {
@@ -51,15 +55,63 @@ const userSchema = new mongoose.Schema({
   verified: {
     type: Boolean,
     default: false,
-  }
+  },
+  otp: {
+    type: Number,
+  },
+  OTP_expiryTime: {
+    type: Date,
+  },
 });
 
-userSchema.methods.checkPw = async function(
-    candidatePassword,
-    userPassword,
-){
-    return await bcrypt.compare(candidatePassword, userPassword);
-}
+userSchema.pre("save", async function (next) {
+  //only run this function if OTP is actually modified
+  if (!this.isModified("otp")) return next();
+
+  //hashing otp with cost of 12
+  this.otp = await bcryptjs.hash(this.otp, 12);
+  next();
+});
+
+userSchema.pre("save", async function (next) {
+  //only run this function if password is actually modified
+  if (!this.isModified("password")) return next();
+
+  //hashing password with cost of 12
+  this.password = await bcryptjs.hash(this.password, 12);
+  next();
+});
+
+//checking pw
+//candidatepw = inputted from user in UI
+//userPW = hashed pw that is actually saved in DB
+userSchema.methods.checkPw = async function (candidatePassword, userPassword) {
+  return await bcrypt.compare(candidatePassword, userPassword);
+};
+
+//checking OTP
+//candidateOTP = inputted from user in UI
+//userOTP = hashed OTP that is actually saved in DB
+userSchema.methods.checkOTP = async function (candidateOTP, userOTP) {
+  return await bcrypt.compare(candidateOTP, userOTP);
+};
+
+userSchema.methods.createPwResetToken = function () {
+  //creating reset token with 32 bytes string and converting into hexadecimal
+  const resetToken = crypto.randomBytes(32).toString("hex");
+  this.pwResetToken = crypto
+    .createHash("sha256")
+    .update(resetToken)
+    .digest("hex");
+
+  this.pwResetExpireDate = Date.now() + 10 * 60 * 1000;
+
+  return resetToken;
+};
+
+userSchema.methods.changePwAfterToken = function (timestamp) {
+  return timestamp < this.pwChangedTime;
+};
 
 const User = new mongoose.model("User", userSchema);
 module.exports = User;
