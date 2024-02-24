@@ -13,6 +13,9 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: [true, "Last Name is required !"],
   },
+  bio: {
+    type: String,
+  },
   avatar: {
     type: String,
   },
@@ -48,6 +51,7 @@ const userSchema = new mongoose.Schema({
   },
   createdAt: {
     type: Date,
+    default: Date.now(),
   },
   updatedAt: {
     type: Date,
@@ -57,7 +61,7 @@ const userSchema = new mongoose.Schema({
     default: false,
   },
   otp: {
-    type: Number,
+    type: String,
   },
   OTP_expiryTime: {
     type: Date,
@@ -66,27 +70,30 @@ const userSchema = new mongoose.Schema({
 
 userSchema.pre("save", async function (next) {
   //only run this function if OTP is actually modified
-  if (!this.isModified("otp")) return next();
+  if (!this.isModified("otp") || !this.otp) return next();
 
   //hashing otp with cost of 12
-  this.otp = await bcryptjs.hash(this.otp, 12);
+  this.otp = await bcrypt.hash(this.otp.toString(), 12);
+
+  console.log(this.otp.toString(), "FROM PRE SAVE HOOK");
+
   next();
 });
 
 userSchema.pre("save", async function (next) {
   //only run this function if password is actually modified
-  if (!this.isModified("password")) return next();
+  if (!this.isModified("password") || !this.password) return next();
 
   //hashing password with cost of 12
-  this.password = await bcryptjs.hash(this.password, 12);
+  this.password = await bcrypt.hash(this.password, 12);
   next();
 });
 
 //checking pw
 //candidatepw = inputted from user in UI
-//userPW = hashed pw that is actually saved in DB
-userSchema.methods.checkPw = async function (candidatePassword, userPassword) {
-  return await bcrypt.compare(candidatePassword, userPassword);
+//userPw = hashed pw that is actually saved in DB
+userSchema.methods.checkPw = async function (candidatePw, userPw) {
+  return await bcrypt.compare(candidatePw, userPw);
 };
 
 //checking OTP

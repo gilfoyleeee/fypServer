@@ -11,27 +11,28 @@ const emailService = require("../services/mail");
 const User = require("../models/user");
 const filterObject = require("../utils/filterObject");
 const { promisify } = require("util");
+const catchAsync = require("../utils/catchAsync");
 
 const signToken = (userID) => jwt.sign({ userID }, process.env.JWT_SECRET_KEY);
 //signup process => register - sendOTP - verifyOTP
 
 //new user registration
-exports.register = async (req, res, next) => {
+exports.register = catchAsync(async (req, res, next) => {
   const { firstName, lastName, email, password } = req.body;
 
   const filteredBody = filterObject(
     req.body,
     "firstName",
     "lastName",
-    "password",
-    "email"
+    "email",
+    "password"
   );
 
   //checking if the user with given email is existed already
   const user_existing_status = await User.findOne({ email: email });
 
   //if email is already linked and verified with otp
-  if (!user_existing_status && user_existing_status.verified) {
+  if (user_existing_status && user_existing_status.verified) {
     res.status(400).json({
       status: "error",
       message:
@@ -39,14 +40,10 @@ exports.register = async (req, res, next) => {
     });
   } //if email is linked but not verified with otp
   else if (user_existing_status) {
-    const updated_user = await User.findOneAndUpdate(
-      { email: email },
-      filteredBody,
-      {
-        new: true,
-        validateModifiedOnly: true,
-      }
-    );
+    await User.findOneAndUpdate({ email: email }, filteredBody, {
+      new: true,
+      validateModifiedOnly: true,
+    });
     req.userID = user_existing_status._id;
     next();
   } else {
@@ -57,9 +54,9 @@ exports.register = async (req, res, next) => {
     req.userID = new_user._id;
     next();
   }
-};
+});
 //otp sending function
-exports.sendOTP = async (req, res, next) => {
+exports.sendOTP = catchAsync(async (req, res, next) => {
   const { userID } = req;
   const new_OTP = otpGenerator.generate(6, {
     lowerCaseAlphabets: false,
@@ -69,15 +66,18 @@ exports.sendOTP = async (req, res, next) => {
   //modifying otp expiry time
   const OTP_expiryTime = Date.now() + 10 * 60 * 1000; //10 mins
 
-  await User.findByIdAndUpdate(userID, {
-    otp: new_OTP,
+  const user = await User.findByIdAndUpdate(userID, {
     OTP_expiryTime,
   });
 
+  user.otp = new_OTP.toString();
+  await user.save({ new: true, validateModifiedOnly: true });
+
+  console.log(new_OTP);
   //send email with otp
   emailService.sendMail({
-    from: "",
-    to: "",
+    from: "kushalthapa023@gmail.com",
+    to: "sanjibdhimal8@gmail.com",
     subject: "Your OTP Verification Code for ChitChat",
     text: `Thank you for choosing our service. To complete your account registration/verification, please use the following One-Time Password (OTP):
 
@@ -92,9 +92,9 @@ exports.sendOTP = async (req, res, next) => {
     status: "success",
     message: "OTP Sent Successfully !",
   });
-};
+});
 
-exports.verifyOTP = async (req, res, next) => {
+exports.verifyOTP = catchAsync(async (req, res, next) => {
   //this is to verify otp and save the user data in the database
   const { email, otp } = req.body;
 
@@ -102,26 +102,46 @@ exports.verifyOTP = async (req, res, next) => {
     email,
     OTP_expiryTime: { $gt: Date.now() },
   });
-
+  //if user is not found
   if (!user) {
     res.status(400).json({
       status: "error",
       message: "Invalid email or OTP expired !",
     });
   }
+  // if user is already verified
+  if (user.verified) {
+    return res.status(400).json({
+      status: "error",
+      message: "Email is already linked with another account !",
+    });
+  }
+
   //if incorrect otp
   if (!(await user.checkOTP(otp, user.otp))) {
     res.status(400).json({
       status: "error",
-      message: "Incorrect OTP !",
+      message: "OTP is incorrect",
     });
+
+    return;
   }
+
   //if correct otp
   user.verified = true;
   user.otp = undefined;
 
   await user.save({ new: true, validateModifiedOnly: true });
-};
+
+  const token = signToken(user._id);
+
+  res.status(200).json({
+    status: "success",
+    message: "OTP verified Successfully!",
+    token,
+    user_id: user._id,
+  });
+});
 
 exports.login = async (req, res, next) => {
   const { email, password } = req.body;

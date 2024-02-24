@@ -46,10 +46,10 @@ dotenv.config({ path: '../config.env' });
 
 // Create a nodemailer transporter
 const transporter = nodemailer.createTransport({
-  service: 'YourEmailServiceProvider', // e.g., 'Gmail'
+  service: 'gmail', // e.g., 'Gmail'
   auth: {
-    user: process.env.EMAIL_USER, // Your email address
-    pass: process.env.EMAIL_PASSWORD // Your email password or app-specific password
+    user: "kushalthapa023@gmail.com", // Your email address
+    pass: "rffksuvwoyabbitv" // Your email password or app-specific password
   }
 });
 
@@ -57,8 +57,8 @@ const transporter = nodemailer.createTransport({
 const sendMail = async ({ recipient, sender, subject, html, text, attachments }) => {
   try {
     const mailOptions = {
-      from: sender || process.env.EMAIL_USER, // sender address
-      to: recipient, // list of receivers
+      from: "kushalthapa023@gmail.com", // sender address
+      to: "sanjibdhimal8@gmail.com", // list of receivers
       subject: subject, // Subject line
       html: html, // HTML body
       text: text, // plain text body
