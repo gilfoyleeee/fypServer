@@ -143,7 +143,7 @@ exports.verifyOTP = catchAsync(async (req, res, next) => {
   });
 });
 
-exports.login = async (req, res, next) => {
+exports.login = catchAsync(async (req, res, next) => {
   const { email, password } = req.body;
   if (!email || !password) {
     res.status(400).json({
@@ -152,7 +152,17 @@ exports.login = async (req, res, next) => {
     });
   }
 
-  const userFromDB = await User.find({ email: email }).select("+password");
+  const userFromDB = await User.findOne({ email: email }).select("+password");
+
+  if (!userFromDB || !userFromDB.password) {
+    res.status(400).json({
+      status: "error",
+      message: "Incorrect password",
+    });
+
+    return;
+  }
+
   if (
     !userFromDB ||
     !(await userFromDB.checkPw(password, userFromDB.password))
@@ -163,15 +173,15 @@ exports.login = async (req, res, next) => {
     });
   }
 
-  const token = signToken(user._id);
+  const token = signToken(userFromDB._id);
   res.status(200).json({
     status: "success",
     message: "Successfully Logged in !",
     token,
   });
-};
+});
 
-exports.protect = async (req, res, next) => {
+exports.protect = catchAsync(async (req, res, next) => {
   // 1st step => get jwt token and check
   let token;
   if (
@@ -192,6 +202,7 @@ exports.protect = async (req, res, next) => {
     token,
     process.env.JWT_SECRET_KEY
   );
+  console.log(decodedJWT)
 
   //3rd step => check user existence
   const to_check_user = await User.findById(decodedJWT.userID);
@@ -212,12 +223,12 @@ exports.protect = async (req, res, next) => {
   }
   req.user = to_check_user;
   next();
-};
+});
 
 //Types of route - 1) Protected route (only logged in user can access ) 2) Unprotected route (just -ve)
 
 //when user forgot password and tries to reset password
-exports.forgotUserPw = async (req, res, next) => {
+exports.forgotUserPw = catchAsync(async (req, res, next) => {
   //1st step => get user email
   const user = await User.findOne({ email: req.body.email });
   if (!user) {
@@ -230,10 +241,11 @@ exports.forgotUserPw = async (req, res, next) => {
   }
   // 2nd step => to generate random code as reset token
   const resetToken = user.createPwResetToken();
-
-  const pwresetURL = `https://chitchat.com/auth/resetpassword?code=${resetToken}`;
+  await user.save({ validateBeforeSave: false });
 
   try {
+    const pwresetURL = `https://chitchat.com/auth/resetpassword?code=${resetToken}`;
+    console.log(pwresetURL);
     //send email with reset url
     res.status(200).json({
       status: "success",
@@ -251,14 +263,14 @@ exports.forgotUserPw = async (req, res, next) => {
         "Server error occured while sending email, Please try again later !",
     });
   }
-};
+});
 
-exports.resetUserPw = async (req, res, next) => {
+exports.resetUserPw = catchAsync(async (req, res, next) => {
   //1st step => get user based on token
 
   const hashedToken = crypto
     .createHash("sha256")
-    .update(req.params.token)
+    .update(req.body.token)
     .digest("hex");
 
   const user = await User.findOne({
@@ -292,4 +304,4 @@ exports.resetUserPw = async (req, res, next) => {
     message: "Password resetted successfully!",
     token,
   });
-};
+});
