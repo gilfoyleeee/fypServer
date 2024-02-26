@@ -77,7 +77,7 @@ exports.sendOTP = catchAsync(async (req, res, next) => {
   //send email with otp
   emailService.sendMail({
     from: "kushalthapa023@gmail.com",
-    to: "sanjibdhimal8@gmail.com",
+    to: user.email,
     subject: "Your OTP Verification Code for ChitChat",
     text: `Thank you for choosing our service. To complete your account registration/verification, please use the following One-Time Password (OTP):
 
@@ -141,39 +141,41 @@ exports.verifyOTP = catchAsync(async (req, res, next) => {
     token,
     user_id: user._id,
   });
+  return;
 });
 
+//login user
 exports.login = catchAsync(async (req, res, next) => {
   const { email, password } = req.body;
+  console.log(email, password);
+
   if (!email || !password) {
     res.status(400).json({
       status: "error",
       message: "Both email and password are required !",
     });
+    return;
   }
 
-  const userFromDB = await User.findOne({ email: email }).select("+password");
+  const user = await User.findOne({ email: email }).select("+password");
 
-  if (!userFromDB || !userFromDB.password) {
+  if (!user || !user.password) {
     res.status(400).json({
       status: "error",
       message: "Incorrect password",
     });
-
     return;
   }
 
-  if (
-    !userFromDB ||
-    !(await userFromDB.checkPw(password, userFromDB.password))
-  ) {
+  if (!user || !(await user.checkPw(password, user.password))) {
     res.status(400).json({
       status: "error",
       message: "Wrong Email or Password !",
     });
+    return;
   }
 
-  const token = signToken(userFromDB._id);
+  const token = signToken(user._id);
   res.status(200).json({
     status: "success",
     message: "Successfully Logged in !",
@@ -191,24 +193,25 @@ exports.protect = catchAsync(async (req, res, next) => {
     token = req.headers.authorization.split(" ")[1];
   } else if (req.cookies.jwt) {
     token = req.cookies.jwt;
-  } else {
+  }
+  if (!token) {
     req.status(400).json({
       status: "error",
       message: "Please log in first to access this page !",
     });
   }
   //2nd step => verify token
-  const decodedJWT = await promisif(jwt.verify)(
+  const decodedJWT = await promisify(jwt.verify)(
     token,
     process.env.JWT_SECRET_KEY
   );
-  console.log(decodedJWT)
+  console.log(decodedJWT);
 
   //3rd step => check user existence
   const to_check_user = await User.findById(decodedJWT.userID);
 
   if (!to_check_user) {
-    res.status(400).json({
+    res.status(401).json({
       status: "error",
       message: "User doesn't exist !",
     });
@@ -244,9 +247,16 @@ exports.forgotUserPw = catchAsync(async (req, res, next) => {
   await user.save({ validateBeforeSave: false });
 
   try {
-    const pwresetURL = `https://chitchat.com/auth/resetpassword?code=${resetToken}`;
+    const pwresetURL = `http://localhost:3000/auth/setnewpw?token=${resetToken}`;
     console.log(pwresetURL);
     //send email with reset url
+    emailService.sendMail({
+      from: "kushalthapa023@gmail.com",
+      to: user.email,
+      subject: "Reset ChitChat Password",
+      text: `${pwresetURL}`
+    })
+
     res.status(200).json({
       status: "success",
       message: "Email for password reset sent successfully !",
@@ -267,7 +277,6 @@ exports.forgotUserPw = catchAsync(async (req, res, next) => {
 
 exports.resetUserPw = catchAsync(async (req, res, next) => {
   //1st step => get user based on token
-
   const hashedToken = crypto
     .createHash("sha256")
     .update(req.body.token)
