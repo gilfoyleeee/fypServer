@@ -180,6 +180,7 @@ exports.login = catchAsync(async (req, res, next) => {
     status: "success",
     message: "Successfully Logged in !",
     token,
+    user_id: user._id,
   });
 });
 

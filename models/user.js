@@ -66,6 +66,19 @@ const userSchema = new mongoose.Schema({
   OTP_expiryTime: {
     type: Date,
   },
+  socket_conID: {
+    type: String,
+  },
+  friends: [
+    {
+      type: mongoose.Schema.ObjectId,
+      ref: "User",
+    },
+  ],
+  status: {
+    type: String,
+    enum: ["Online", "Offline"],
+  },
 });
 
 userSchema.pre("save", async function (next) {

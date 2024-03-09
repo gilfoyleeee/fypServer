@@ -54,11 +54,11 @@ const transporter = nodemailer.createTransport({
 });
 
 // Function to send email using nodemailer
-const sendMail = async ({ recipient, sender, subject, html, text, attachments }) => {
+const sendMail = async ({ sender, reciever, subject, html, text, attachments }) => {
   try {
     const mailOptions = {
-      from: "kushalthapa023@gmail.com", // sender address
-      to: "sanjibdhimal8@gmail.com", // list of receivers
+      sender: "kushalthapa023@gmail.com", // sender address
+      reciever: user.email, // list of receivers
       subject: subject, // Subject line
       html: html, // HTML body
       text: text, // plain text body

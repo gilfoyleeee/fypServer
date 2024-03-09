@@ -10,4 +10,13 @@ router.patch(
   userController.updateProfile
 );
 
+router.get("/get_friends", authController.protect, userController.getFriends);
+
+router.get(
+  "/get_friendrequests",
+  authController.protect,
+  userController.getFrnRequests
+);
+
+router.get("/get_users", authController.protect, userController.getUsersFromDB);
 module.exports = router;
