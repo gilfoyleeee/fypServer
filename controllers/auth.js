@@ -33,7 +33,7 @@ exports.register = catchAsync(async (req, res, next) => {
 
   //if email is already linked and verified with otp
   if (user_existing_status && user_existing_status.verified) {
-    res.status(400).json({
+    return res.status(400).json({
       status: "error",
       message:
         "An account is already linked to this email address, Please login !",
@@ -64,10 +64,10 @@ exports.sendOTP = catchAsync(async (req, res, next) => {
     specialChars: false,
   });
   //modifying otp expiry time
-  const OTP_expiryTime = Date.now() + 10 * 60 * 1000; //10 mins
+  const otp_expiry_time = Date.now() + 10 * 60 * 1000; //10 mins
 
   const user = await User.findByIdAndUpdate(userID, {
-    OTP_expiryTime,
+    otp_expiry_time: otp_expiry_time,
   });
 
   user.otp = new_OTP.toString();
@@ -100,11 +100,11 @@ exports.verifyOTP = catchAsync(async (req, res, next) => {
 
   const user = await User.findOne({
     email,
-    OTP_expiryTime: { $gt: Date.now() },
+    otp_expiry_time: { $gt: Date.now() },
   });
   //if user is not found
   if (!user) {
-    res.status(400).json({
+    return res.status(400).json({
       status: "error",
       message: "Invalid email or OTP expired !",
     });
@@ -141,7 +141,6 @@ exports.verifyOTP = catchAsync(async (req, res, next) => {
     token,
     user_id: user._id,
   });
-  return;
 });
 
 //login user
@@ -186,6 +185,8 @@ exports.login = catchAsync(async (req, res, next) => {
 
 exports.protect = catchAsync(async (req, res, next) => {
   // 1st step => get jwt token and check
+
+  console.log("this is from protect")
   let token;
   if (
     req.headers.authorization &&
@@ -196,7 +197,7 @@ exports.protect = catchAsync(async (req, res, next) => {
     token = req.cookies.jwt;
   }
   if (!token) {
-    req.status(400).json({
+     return res.status(401).json({
       status: "error",
       message: "Please log in first to access this page !",
     });
@@ -209,23 +210,23 @@ exports.protect = catchAsync(async (req, res, next) => {
   console.log(decodedJWT);
 
   //3rd step => check user existence
-  const to_check_user = await User.findById(decodedJWT.userID);
+  const this_user = await User.findById(decodedJWT.userID);
 
-  if (!to_check_user) {
-    res.status(401).json({
+  if (!this_user) {
+    return res.status(401).json({
       status: "error",
       message: "User doesn't exist !",
     });
   }
   //4th step => check if user change password after token issued
   //iat => the time when token was created
-  if (to_check_user.changePwAfterToken(decodedJWT.iat)) {
-    res.status(400).json({
+  if (this_user.changePwAfterToken(decodedJWT.iat)) {
+    return res.status(401).json({
       status: "error",
       message: "Password expired, Please login again !",
     });
   }
-  req.user = to_check_user;
+  req.user = this_user;
   next();
 });
 
@@ -268,7 +269,7 @@ exports.forgotUserPw = catchAsync(async (req, res, next) => {
 
     await user.save({ validateBeforeSave: false });
 
-    res.status(500).json({
+    return res.status(500).json({
       status: "error",
       message:
         "Server error occured while sending email, Please try again later !",

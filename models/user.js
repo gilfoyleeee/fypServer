@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 
+
 const userSchema = new mongoose.Schema({
   firstName: {
     type: String,
@@ -63,10 +64,10 @@ const userSchema = new mongoose.Schema({
   otp: {
     type: String,
   },
-  OTP_expiryTime: {
+  otp_expiry_time: {
     type: Date,
   },
-  socket_conID: {
+  socket_id: {
     type: String,
   },
   friends: [
@@ -102,6 +103,15 @@ userSchema.pre("save", async function (next) {
   next();
 });
 
+userSchema.pre("save", function (next) {
+  if (!this.isModified("password") || this.isNew || !this.password)
+    return next();
+
+  this.pwChangedTime = Date.now() - 1000;
+  next();
+});
+
+
 //checking pw
 //candidatepw = inputted from user in UI
 //userPw = hashed pw that is actually saved in DB
@@ -129,8 +139,17 @@ userSchema.methods.createPwResetToken = function () {
   return resetToken;
 };
 
-userSchema.methods.changePwAfterToken = function (timestamp) {
-  return timestamp < this.pwChangedTime;
+userSchema.methods.changePwAfterToken = function (JWTTimeStamp) {
+  if (this.pwChangedTime) {
+    const changedTimeStamp = parseInt(
+      this.pwChangedTime.getTime() / 1000,
+      10
+    );
+    return JWTTimeStamp < changedTimeStamp;
+  }
+
+  // FALSE MEANS NOT CHANGED
+  return false;
 };
 
 const User = new mongoose.model("User", userSchema);

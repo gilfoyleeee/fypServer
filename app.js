@@ -23,12 +23,6 @@ const cors = require("cors");
 
 const app = express();
 
-app.use(
-  express.urlencoded({
-    extended: true,
-  })
-);
-
 app.use(mongoSanitize());
 // app.use(XSS());
 
@@ -56,6 +50,14 @@ const limiter = rateLimit({
   message: "Too many requests from this IP, Please try again later.",
 });
 app.use("/chitchat", limiter);
+app.use(
+  express.urlencoded({
+    extended: true,
+  })
+);
+
+// app.use(xss());
+
 
 app.use(routes);
 
